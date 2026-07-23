@@ -1,8 +1,8 @@
 function getBackendUrl(req) {
-  const forwarded = req.headers['x-forwarded-host'];
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
   const proto = req.headers['x-forwarded-proto'] || 'https';
-  if (forwarded) return `${proto}://${forwarded}`;
-  return process.env.BACKEND_URL || `${req.protocol}://${req.hostname}`;
+  if (host && !host.includes('localhost')) return `${proto}://${host}`;
+  return process.env.BACKEND_URL || 'https://nexus-backend-vod4.onrender.com';
 }
 
 async function authRoutes(fastify) {
