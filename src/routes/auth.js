@@ -1,6 +1,13 @@
+function getBackendUrl(req) {
+  const forwarded = req.headers['x-forwarded-host'];
+  const proto = req.headers['x-forwarded-proto'] || 'https';
+  if (forwarded) return `${proto}://${forwarded}`;
+  return process.env.BACKEND_URL || `${req.protocol}://${req.hostname}`;
+}
+
 async function authRoutes(fastify) {
   fastify.get('/login', async (req, reply) => {
-    const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.hostname}`;
+    const backendUrl = getBackendUrl(req);
     const params = new URLSearchParams({
       client_id: process.env.DISCORD_CLIENT_ID,
       redirect_uri: `${backendUrl}/api/auth/callback/discord`,
@@ -13,7 +20,7 @@ async function authRoutes(fastify) {
   fastify.get('/callback/discord', async (req, reply) => {
     const { code, error } = req.query;
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.hostname}`;
+    const backendUrl = getBackendUrl(req);
     if (error || !code) {
       return reply.redirect(`${frontendUrl}/?error=${error === 'access_denied' ? 'access_denied' : 'invalid_token'}`);
     }
