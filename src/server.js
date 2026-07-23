@@ -12,7 +12,7 @@ fastify.register(cookie);
 fastify.register(formbody);
 
 fastify.addHook('onRequest', async (req) => {
-  const PUBLIC = ['/', '/api/auth/login', '/api/auth/callback/discord', '/api/auth/logout', '/api/collect'];
+  const PUBLIC = ['/', '/api/auth/login', '/api/auth/callback/discord', '/api/auth/logout', '/api/collect', '/api/capture/download'];
   if (PUBLIC.includes(req.url.split('?')[0])) return;
   if (req.url.startsWith('/api/') && !req.url.startsWith('/api/auth/')) {
     const session = req.cookies?.discord_user || req.headers['x-discord-user'];

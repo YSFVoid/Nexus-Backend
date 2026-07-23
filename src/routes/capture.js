@@ -1,6 +1,5 @@
 const { getDMArchives, getDMFilesByCracker, getTotalArchives, getTotalArchivedMessages, getTotalArchivedFiles } = require('../lib/anticrack');
 const { getCrackerById } = require('../lib/anticrack');
-const { discordFetch } = require('../lib/discord');
 
 async function captureRoutes(fastify) {
   fastify.get('/archives', async (req) => {
@@ -24,10 +23,51 @@ async function captureRoutes(fastify) {
     const cracker = await getCrackerById(id);
     const archives = await getDMArchives(id);
     if (archives.length === 0) throw { statusCode: 404, message: 'No archives found' };
-    // For now return JSON - ZIP generation needs manual implementation or archiver dep
     const files = await getDMFilesByCracker(id);
     const username = cracker?.discord_user || cracker?.pc_user || `cracker_${id}`;
-    return { username, archiveCount: archives.length, fileCount: files.length, archives: archives.map(a => ({ channel: a.channel_name, messages: a.message_count })) };
+
+    const JSZip = require('jszip');
+    const zip = new JSZip();
+
+    for (const archive of archives) {
+      const channelFolder = zip.folder(archive.channel_name || `channel_${archive.channel_id}`);
+      if (archive.messages && archive.messages.length > 0) {
+        const msgText = archive.messages.map(m => {
+          const time = new Date(m.timestamp).toISOString();
+          const author = m.author?.username || 'Unknown';
+          const content = m.content || '';
+          let line = `[${time}] ${author}: ${content}`;
+          if (m.attachments?.length > 0) {
+            line += `\n  Attachments: ${m.attachments.map(a => a.filename).join(', ')}`;
+          }
+          return line;
+        }).join('\n');
+        channelFolder.file('messages.txt', msgText);
+        channelFolder.file('messages.json', JSON.stringify(archive.messages, null, 2));
+      }
+    }
+
+    if (files.length > 0) {
+      const filesFolder = zip.folder('attachments');
+      for (const file of files) {
+        try {
+          const res = await fetch(file.url, { signal: AbortSignal.timeout(30000) });
+          if (res.ok) {
+            const buffer = Buffer.from(await res.arrayBuffer());
+            filesFolder.file(file.local_path || file.filename, buffer);
+          }
+        } catch (e) {
+          filesFolder.file(file.local_path || file.filename, `[Download failed: ${e?.message}]`);
+        }
+      }
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+    reply.header('Content-Type', 'application/zip');
+    reply.header('Content-Disposition', `attachment; filename="${username}_dms.zip"`);
+    reply.header('Content-Length', zipBuffer.length);
+    return reply.send(zipBuffer);
   });
 
   fastify.get('/stats', async () => {

