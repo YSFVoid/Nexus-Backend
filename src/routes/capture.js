@@ -5,12 +5,17 @@ const { discordFetch } = require('../lib/discord');
 async function captureRoutes(fastify) {
   fastify.get('/archives', async (req) => {
     const { id, archiveId, action } = req.query;
-    if (archiveId) {
-      const archives = await getDMArchives(parseInt(id));
-      return archives.find(a => a.id === parseInt(archiveId)) || null;
+    try {
+      if (archiveId) {
+        const archives = await getDMArchives(parseInt(id));
+        return archives.find(a => a.id === parseInt(archiveId)) || null;
+      }
+      if (action === 'history') return [];
+      return await getDMArchives(parseInt(id));
+    } catch (e) {
+      console.error('Archives error:', e?.message || e);
+      return [];
     }
-    if (action === 'history') return []; // placeholder
-    return getDMArchives(parseInt(id));
   });
 
   fastify.get('/download', async (req, reply) => {
