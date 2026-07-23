@@ -1,8 +1,9 @@
 async function authRoutes(fastify) {
   fastify.get('/login', async (req, reply) => {
+    const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.hostname}`;
     const params = new URLSearchParams({
       client_id: process.env.DISCORD_CLIENT_ID,
-      redirect_uri: `${process.env.BACKEND_URL}/api/auth/callback/discord`,
+      redirect_uri: `${backendUrl}/api/auth/callback/discord`,
       response_type: 'code',
       scope: 'identify email guilds',
     });
@@ -12,6 +13,7 @@ async function authRoutes(fastify) {
   fastify.get('/callback/discord', async (req, reply) => {
     const { code, error } = req.query;
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.hostname}`;
     if (error || !code) {
       return reply.redirect(`${frontendUrl}/?error=${error === 'access_denied' ? 'access_denied' : 'invalid_token'}`);
     }
@@ -21,7 +23,7 @@ async function authRoutes(fastify) {
         client_secret: process.env.DISCORD_CLIENT_SECRET,
         grant_type: 'authorization_code',
         code,
-        redirect_uri: `${process.env.BACKEND_URL}/api/auth/callback/discord`,
+        redirect_uri: `${backendUrl}/api/auth/callback/discord`,
       });
       const tokenRes = await fetch('https://discord.com/api/v10/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params });
       if (!tokenRes.ok) return reply.redirect(`${frontendUrl}/?error=invalid_token`);
