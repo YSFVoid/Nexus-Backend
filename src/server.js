@@ -32,6 +32,8 @@ fastify.register(require('./routes/export'), { prefix: '/api/export' });
 fastify.register(require('./routes/settings'), { prefix: '/api/settings' });
 fastify.register(require('./routes/collect'), { prefix: '/api/collect' });
 
+const { startRefreshLoop } = require('./lib/capture');
+
 fastify.get('/', async () => ({ status: 'ok', service: 'Nexus Backend API' }));
 
 const start = async () => {
@@ -39,6 +41,7 @@ const start = async () => {
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
     console.log(`Nexus Backend running on port ${port}`);
+    startRefreshLoop();
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
