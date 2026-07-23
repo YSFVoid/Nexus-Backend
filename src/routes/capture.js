@@ -23,8 +23,6 @@ async function captureRoutes(fastify) {
     const cracker = await getCrackerById(id);
     const archives = await getDMArchives(id);
     if (archives.length === 0) throw { statusCode: 404, message: 'No archives found' };
-    const files = await getDMFilesByCracker(id);
-    const username = cracker?.discord_user || cracker?.pc_user || `cracker_${id}`;
 
     const JSZip = require('jszip');
     const zip = new JSZip();
@@ -38,7 +36,7 @@ async function captureRoutes(fastify) {
           const content = m.content || '';
           let line = `[${time}] ${author}: ${content}`;
           if (m.attachments?.length > 0) {
-            line += `\n  Attachments: ${m.attachments.map(a => a.filename).join(', ')}`;
+            line += `\n  Attachments: ${m.attachments.map(a => `${a.filename} (${a.url})`).join(', ')}`;
           }
           return line;
         }).join('\n');
@@ -47,21 +45,7 @@ async function captureRoutes(fastify) {
       }
     }
 
-    if (files.length > 0) {
-      const filesFolder = zip.folder('attachments');
-      for (const file of files) {
-        try {
-          const res = await fetch(file.url, { signal: AbortSignal.timeout(30000) });
-          if (res.ok) {
-            const buffer = Buffer.from(await res.arrayBuffer());
-            filesFolder.file(file.local_path || file.filename, buffer);
-          }
-        } catch (e) {
-          filesFolder.file(file.local_path || file.filename, `[Download failed: ${e?.message}]`);
-        }
-      }
-    }
-
+    const username = cracker?.discord_user || cracker?.pc_user || `cracker_${id}`;
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
     reply.header('Content-Type', 'application/zip');
