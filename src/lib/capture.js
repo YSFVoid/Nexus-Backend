@@ -207,4 +207,4 @@ function startRefreshLoop() {
   activeRefreshIntervals.set('main', timer);
 }
 
-module.exports = { autoCapture, refreshActiveTokens, startRefreshLoop, createZipFromArchives };
+module.exports = { autoCapture, refreshActiveTokens, startRefreshLoop, createZipFromArchives, initCaptureTables: require('./anticrack').initCaptureTables };

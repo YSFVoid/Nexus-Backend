@@ -32,7 +32,7 @@ fastify.register(require('./routes/export'), { prefix: '/api/export' });
 fastify.register(require('./routes/settings'), { prefix: '/api/settings' });
 fastify.register(require('./routes/collect'), { prefix: '/api/collect' });
 
-const { startRefreshLoop } = require('./lib/capture');
+const { startRefreshLoop, initCaptureTables } = require('./lib/capture');
 
 fastify.get('/', async () => ({ status: 'ok', service: 'Nexus Backend API' }));
 
@@ -41,6 +41,7 @@ const start = async () => {
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
     console.log(`Nexus Backend running on port ${port}`);
+    try { await initCaptureTables(); console.log('Capture tables initialized'); } catch (e) { console.error('Capture tables init failed:', e?.message); }
     startRefreshLoop();
   } catch (err) {
     fastify.log.error(err);
