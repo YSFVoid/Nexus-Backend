@@ -1,0 +1,21 @@
+{
+  "name": "nexus-backend",
+  "version": "1.0.0",
+  "description": "Nexus Dashboard Backend API",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [],
+  "author": "YSFVoid",
+  "license": "ISC",
+  "dependencies": {
+    "fastify": "^5.3.3",
+    "@fastify/cors": "^11.0.0",
+    "@fastify/cookie": "^11.0.2",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.7",
+    "pg": "^8.13.1"
+  }
+}
