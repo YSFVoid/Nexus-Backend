@@ -48,9 +48,10 @@ async function authRoutes(fastify) {
       }
 
       const isProd = process.env.NODE_ENV === 'production';
-      reply.setCookie('discord_token', access_token, { httpOnly: true, secure: isProd, sameSite: 'lax', maxAge: 60 * 60 * 24 * 7, path: '/' });
-      reply.setCookie('discord_user', JSON.stringify(user), { httpOnly: true, secure: isProd, sameSite: 'lax', maxAge: 60 * 60 * 24 * 7, path: '/' });
-      reply.redirect(`${frontendUrl}/dashboard`);
+      reply.setCookie('discord_token', access_token, { httpOnly: true, secure: isProd, sameSite: 'none', maxAge: 60 * 60 * 24 * 7, path: '/' });
+      reply.setCookie('discord_user', JSON.stringify(user), { httpOnly: true, secure: isProd, sameSite: 'none', maxAge: 60 * 60 * 24 * 7, path: '/' });
+      const userData = Buffer.from(JSON.stringify(user)).toString('base64');
+      reply.redirect(`${frontendUrl}/dashboard?user=${userData}&token=${encodeURIComponent(access_token)}`);
     } catch {
       reply.redirect(`${frontendUrl}/?error=invalid_token`);
     }
